@@ -1,0 +1,32 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Product Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+  background: linear-gradient(135deg, #1e3a8a 0%, #374151 100%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.loading, .error {
+  text-align: center;
+  color: white;
+  font-size: 1.4rem;
+  margin-top: 50px;
+}
+
+.error button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: white;
+  color: #1e3a8a;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
