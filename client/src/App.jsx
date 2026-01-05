@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarDays, faUsers, faUserPlus, faMagnifyingGlass, faStickyNote, faHorseHead, faHorse, faChartLine, faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
 import SearchBox from './components/SearchBox';
 import ConfirmModal from './components/ConfirmModal';
+import ListView from './components/ListView';
 import './App.css';
 
 const API_URL = 'http://localhost:3001/api';
@@ -640,152 +641,137 @@ function App() {
         </nav>
 
         {activeTab === 'home' ? (
-          <>
-            <h2 className="form-title">
-              <FontAwesomeIcon icon={faUsers} style={{ marginRight: '10px' }} />
-              Students
-            </h2>
-            
-            <div className="search-create-container students-search-container">
+          <ListView
+            icon={<FontAwesomeIcon icon={faUsers} style={{ marginRight: '10px' }} />}
+            title="Students"
+            searchBar={
               <SearchBox 
                 value={searchTerm}
                 onChange={handleSearchChange}
                 placeholder="Search students by name..."
               />
+            }
+            createButton={
               <button className="create-btn" onClick={() => setShowModal(true)}>
                 + Create
               </button>
-            </div>
-
-            {loading ? (
-              <div className="loading-inline">Loading...</div>
-            ) : students.length === 0 ? (
-              <div className="no-results">No students found</div>
-            ) : (
-              <>
-                <div className="student-list">
-                  {students.map(student => (
-                    <div key={student.id} className="student-card" onClick={() => handleStudentClick(student.id)}>
-                      <div className="student-info">
-                        <div className="student-avatar">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="student-details">
-                          <h3 className="student-name">
-                            {student.name}
-                            {student.notes && (
-                              <FontAwesomeIcon icon={faStickyNote} className="notes-icon" title="Has notes" />
-                            )}
-                          </h3>
-                          <div className="lessons-info">
-                            <span className={`lessons-badge ${student.lessonsRemaining <= 3 ? 'low' : ''}`}>
-                              {student.lessonsRemaining} {student.lessonsRemaining === 1 ? 'lesson' : 'lessons'} remaining
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        className="check-in-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCheckIn(student.id);
-                        }}
-                        disabled={student.lessonsRemaining === 0}
-                      >
-                        {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
-                      </button>
-                    </div>
-                  ))}
+            }
+            loading={loading}
+            isEmpty={students.length === 0}
+            emptyMessage="No students found"
+            pagination={totalPages > 1 && (
+              <div className="pagination">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="pagination-btn"
+                >
+                  Previous
+                </button>
+                
+                <div className="pagination-info">
+                  Page {currentPage} of {totalPages}
                 </div>
-
-                {totalPages > 1 && (
-                  <div className="pagination">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="pagination-btn"
-                    >
-                      Previous
-                    </button>
-                    
-                    <div className="pagination-info">
-                      Page {currentPage} of {totalPages}
-                    </div>
-                    
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="pagination-btn"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </>
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="pagination-btn"
+                >
+                  Next
+                </button>
+              </div>
             )}
-          </>
+          >
+            {students.map(student => (
+              <div key={student.id} className="student-card" onClick={() => handleStudentClick(student.id)}>
+                <div className="student-info">
+                  <div className="student-avatar">
+                    {student.name.split(' ').map(n => n[0]).join('')}
+                  </div>
+                  <div className="student-details">
+                    <h3 className="student-name">
+                      {student.name}
+                      {student.notes && (
+                        <FontAwesomeIcon icon={faStickyNote} className="notes-icon" title="Has notes" />
+                      )}
+                    </h3>
+                    <div className="lessons-info">
+                      <span className={`lessons-badge ${student.lessonsRemaining <= 3 ? 'low' : ''}`}>
+                        {student.lessonsRemaining} {student.lessonsRemaining === 1 ? 'lesson' : 'lessons'} remaining
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="check-in-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCheckIn(student.id);
+                  }}
+                  disabled={student.lessonsRemaining === 0}
+                >
+                  {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
+                </button>
+              </div>
+            ))}
+          </ListView>
         ) : activeTab === 'registration' ? (
-          <div className="horses-view">
-            <h2 className="form-title">
-              <FontAwesomeIcon icon={faHorseHead} style={{ marginRight: '10px' }} />
-              Horses
-            </h2>
-            
-            <div className="search-create-container">
+          <ListView
+            icon={<FontAwesomeIcon icon={faHorseHead} style={{ marginRight: '10px' }} />}
+            title="Horses"
+            searchBar={
               <SearchBox 
                 value={horseSearchTerm}
                 onChange={handleHorseSearchChange}
                 placeholder="Search horses by name..."
               />
+            }
+            createButton={
               <button className="create-btn" onClick={() => setShowHorseModal(true)}>
                 + Create
               </button>
-            </div>
-            
-            {loading ? (
-              <div className="loading-inline">Loading horses...</div>
-            ) : horses.filter(horse => 
-                horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
-              ).length === 0 ? (
-              <div className="no-results">No horses found</div>
-            ) : (
-              <>
-                <div className="horses-header">
-                  <span className="horses-header-label">Condition</span>
-                </div>
-                <div className="student-list">
-                  {horses.filter(horse => 
-                    horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
-                  ).map(horse => {
-                  const lessonCount = horseLessonCounts.find(h => h.horseId === horse.id)?.count || 0;
-                  return (
-                    <div key={horse.id} className="student-card">
-                      <div className="student-info">
-                        <div className="student-avatar">
-                          {horse.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="student-details">
-                          <h3 className="student-name">{horse.name}</h3>
-                          <div className="lessons-info">
-                            <span className="lessons-badge">
-                              {horse.ridingStyle} · {horse.difficultyLevel}
-                            </span>
-                            <span className={`lessons-badge ${lessonCount >= 3 ? 'low' : ''}`} style={{ marginLeft: '8px' }}>
-                              {lessonCount} {lessonCount === 1 ? 'lesson' : 'lessons'} today
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <span className={`lessons-badge ${horse.condition.toLowerCase()}`}>
-                        {horse.condition}
-                      </span>
-                    </div>
-                  );
-                })}
+            }
+            loading={loading}
+            isEmpty={horses.filter(horse => 
+              horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
+            ).length === 0}
+            emptyMessage="No horses found"
+            extraHeader={
+              <div className="horses-header">
+                <span className="horses-header-label">Condition</span>
               </div>
-              </>
-            )}
-          </div>
+            }
+          >
+            {horses.filter(horse => 
+              horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
+            ).map(horse => {
+              const lessonCount = horseLessonCounts.find(h => h.horseId === horse.id)?.count || 0;
+              return (
+                <div key={horse.id} className="student-card">
+                  <div className="student-info">
+                    <div className="student-avatar">
+                      {horse.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div className="student-details">
+                      <h3 className="student-name">{horse.name}</h3>
+                      <div className="lessons-info">
+                        <span className="lessons-badge">
+                          {horse.ridingStyle} · {horse.difficultyLevel}
+                        </span>
+                        <span className={`lessons-badge ${lessonCount >= 3 ? 'low' : ''}`} style={{ marginLeft: '8px' }}>
+                          {lessonCount} {lessonCount === 1 ? 'lesson' : 'lessons'} today
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`lessons-badge ${horse.condition.toLowerCase()}`}>
+                    {horse.condition}
+                  </span>
+                </div>
+              );
+            })}
+          </ListView>
         ) : activeTab === 'reports' ? (
           <div className="reports-view">
             <h2 className="form-title">
@@ -819,166 +805,154 @@ function App() {
             </div>
           </div>
         ) : activeTab === 'teachers' ? (
-          <div className="teachers-view">
-            <h2 className="form-title">
-              <FontAwesomeIcon icon={faChalkboardTeacher} style={{ marginRight: '10px' }} />
-              Instructors
-            </h2>
-            
-            <div className="search-create-container">
+          <ListView
+            icon={<FontAwesomeIcon icon={faChalkboardTeacher} style={{ marginRight: '10px' }} />}
+            title="Instructors"
+            searchBar={
               <SearchBox 
                 value={teacherSearchTerm}
                 onChange={handleTeacherSearchChange}
                 placeholder="Search instructors by name..."
               />
+            }
+            createButton={
               <button className="create-btn" onClick={() => setShowInstructorModal(true)}>
                 + Create
               </button>
-            </div>
-            
-            {loading ? (
-              <div className="loading-inline">Loading instructors...</div>
-            ) : teachers.filter(teacher => {
-                const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-                return fullName.includes(teacherSearchTerm.toLowerCase());
-              }).length === 0 ? (
-              <div className="no-results">No instructors found</div>
-            ) : (
-              <div className="student-list">
-                {teachers.filter(teacher => {
-                  const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-                  return fullName.includes(teacherSearchTerm.toLowerCase());
-                }).map(teacher => (
-                  <div key={teacher.id} className="student-card" onClick={() => handleInstructorClick(teacher.id)}>
-                    <div className="student-info">
-                      <div className="student-avatar">
-                        {teacher.firstName[0]}{teacher.lastName[0]}
-                      </div>
-                      <div className="student-details">
-                        <h3 className="student-name">{teacher.firstName} {teacher.lastName}</h3>
-                        <div className="lessons-info">
-                          <span className="lessons-badge">
-                            {teacher.specialty}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <span className="lessons-badge">
-                      {teacher.experience} years
-                    </span>
+            }
+            loading={loading}
+            isEmpty={teachers.filter(teacher => {
+              const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
+              return fullName.includes(teacherSearchTerm.toLowerCase());
+            }).length === 0}
+            emptyMessage="No instructors found"
+          >
+            {teachers.filter(teacher => {
+              const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
+              return fullName.includes(teacherSearchTerm.toLowerCase());
+            }).map(teacher => (
+              <div key={teacher.id} className="student-card" onClick={() => handleInstructorClick(teacher.id)}>
+                <div className="student-info">
+                  <div className="student-avatar">
+                    {teacher.firstName[0]}{teacher.lastName[0]}
                   </div>
-                ))}
+                  <div className="student-details">
+                    <h3 className="student-name">{teacher.firstName} {teacher.lastName}</h3>
+                    <div className="lessons-info">
+                      <span className="lessons-badge">
+                        {teacher.specialty}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <span className="lessons-badge">
+                  {teacher.experience} years
+                </span>
               </div>
-            )}
-          </div>
+            ))}
+          </ListView>
         ) : activeTab === 'schedule' ? (
-          <div className="schedule-view">
-            <h2 className="form-title">
-              <FontAwesomeIcon icon={faCalendarDays} style={{ marginRight: '10px' }} />
-              Schedule
-            </h2>
-            
-            <div className="date-selector">
-              <div className="date-nav-group">
-                <button 
-                    onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() - 1)))}
-                    className="date-nav-btn"
-                  >
-                    ← Previous
-                  </button>
-                  <div className="current-date">
-                    {selectedDate.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
+          <ListView
+            icon={<FontAwesomeIcon icon={faCalendarDays} style={{ marginRight: '10px' }} />}
+            title="Schedule"
+            extraHeader={
+              <div className="date-selector">
+                <div className="date-nav-group">
+                  <button 
+                      onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() - 1)))}
+                      className="date-nav-btn"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="current-date">
+                      {selectedDate.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </div>
+                    <button 
+                      onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() + 1)))}
+                      className="date-nav-btn"
+                    >
+                      Next →
+                    </button>
                   </div>
                   <button 
-                    onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() + 1)))}
-                    className="date-nav-btn"
+                    onClick={() => handleDateChange(new Date())}
+                    className="today-btn"
                   >
-                    Next →
+                    Go to Today
                   </button>
                 </div>
-                <button 
-                  onClick={() => handleDateChange(new Date())}
-                  className="today-btn"
-                >
-                  Go to Today
-                </button>
-              </div>
-
-            {loading ? (
-              <div className="loading-inline">Loading schedule...</div>
-            ) : scheduledLessons.length === 0 ? (
-              <div className="no-results">No lessons scheduled for this day</div>
-            ) : (
-              <div className="schedule-list">
-                {scheduledLessons.map((lesson, index) => (
-                  <div key={index} className="schedule-card">
-                    <div className="schedule-time">{lesson.time}</div>
-                    <div className="schedule-details">
-                      <div className="schedule-student">
-                        <div className="student-avatar">
-                          {lesson.studentName.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <h3 className="student-name">{lesson.studentName}</h3>
-                          <p className={`lesson-type ${lesson.lessonsRemaining < 3 ? 'low-credit' : ''}`}>
-                            {lesson.lessonsRemaining < 3 && (
-                              <span className="warning-icon">⚠️</span>
-                            )}
-                            {lesson.lessonsRemaining} {lesson.lessonsRemaining === 1 ? 'credit' : 'credits'}
-                          </p>
-                          {lesson.horseName && (
-                            <p className="lesson-horse">
-                              <FontAwesomeIcon icon={faHorse} className="horse-icon-small" /> {lesson.horseName}
-                            </p>
-                          )}
-                          {lesson.instructorName && (
-                            <p className="lesson-instructor">
-                              <FontAwesomeIcon icon={faChalkboardTeacher} className="instructor-icon-small" /> {lesson.instructorName}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="schedule-actions">
-                        {(lesson.status === 'completed' || lesson.status === 'cancelled') && (
-                          <div className="status-badge-wrapper">
-                            <span className={`status-badge ${lesson.status}`}>
-                              {lesson.status === 'completed' ? 'Completed' : 'Cancelled'}
-                            </span>
-                          </div>
-                        )}
-                        {lesson.status === 'scheduled' && (
-                          <>
-                            <button 
-                              className="checkin-btn-small"
-                              onClick={() => handleLessonCheckIn(lesson)}
-                            >
-                              Check In
-                            </button>
-                            <button 
-                              className="reschedule-btn-small"
-                              onClick={() => handleRescheduleLesson(lesson)}
-                            >
-                              Reschedule
-                            </button>
-                          </>
-                        )}
+            }
+            loading={loading}
+            isEmpty={scheduledLessons.length === 0}
+            emptyMessage="No lessons scheduled for this day"
+          >
+            {scheduledLessons.map((lesson, index) => (
+              <div key={index} className="schedule-card">
+                <div className="schedule-time">{lesson.time}</div>
+                <div className="schedule-details">
+                  <div className="schedule-student">
+                    <div className="student-avatar">
+                      {lesson.studentName.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <h3 className="student-name">{lesson.studentName}</h3>
+                      <p className={`lesson-type ${lesson.lessonsRemaining < 3 ? 'low-credit' : ''}`}>
                         {lesson.lessonsRemaining < 3 && (
-                          <button className="renew-btn-small">
-                            Renew
-                          </button>
+                          <span className="warning-icon">⚠️</span>
                         )}
-                      </div>
+                        {lesson.lessonsRemaining} {lesson.lessonsRemaining === 1 ? 'credit' : 'credits'}
+                      </p>
+                      {lesson.horseName && (
+                        <p className="lesson-horse">
+                          <FontAwesomeIcon icon={faHorse} className="horse-icon-small" /> {lesson.horseName}
+                        </p>
+                      )}
+                      {lesson.instructorName && (
+                        <p className="lesson-instructor">
+                          <FontAwesomeIcon icon={faChalkboardTeacher} className="instructor-icon-small" /> {lesson.instructorName}
+                        </p>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <div className="schedule-actions">
+                    {(lesson.status === 'completed' || lesson.status === 'cancelled') && (
+                      <div className="status-badge-wrapper">
+                        <span className={`status-badge ${lesson.status}`}>
+                          {lesson.status === 'completed' ? 'Completed' : 'Cancelled'}
+                        </span>
+                      </div>
+                    )}
+                    {lesson.status === 'scheduled' && (
+                      <>
+                        <button 
+                          className="checkin-btn-small"
+                          onClick={() => handleLessonCheckIn(lesson)}
+                        >
+                          Check In
+                        </button>
+                        <button 
+                          className="reschedule-btn-small"
+                          onClick={() => handleRescheduleLesson(lesson)}
+                        >
+                          Reschedule
+                        </button>
+                      </>
+                    )}
+                    {lesson.lessonsRemaining < 3 && (
+                      <button className="renew-btn-small">
+                        Renew
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+            ))}
+          </ListView>
         ) : null}
       </div>
 

@@ -277,7 +277,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px;
+  padding: 20px 30px;
   background: #f8f9fa;
   border-radius: 12px;
   transition: all 0.3s ease;
@@ -372,6 +372,21 @@
   margin: 0 auto;
 }
 
+.students-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.list-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.list-items {
+  display: grid;
+  gap: 15px;
+}
+
 .schedule-header {
   margin-bottom: 30px;
 }
@@ -454,7 +469,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 20px;
+  padding: 20px 30px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 2px solid transparent;
