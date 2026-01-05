@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarDays, faUsers, faUserPlus, faMagnifyingGlass, faStickyNote, faHorseHead, faHorse, faChartLine, faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
 import SearchBox from './components/SearchBox';
+import ConfirmModal from './components/ConfirmModal';
 import './App.css';
 
 const API_URL = 'http://localhost:3001/api';
@@ -928,11 +929,7 @@ function App() {
                             {lesson.lessonsRemaining < 3 && (
                               <span className="warning-icon">⚠️</span>
                             )}
-                            {lesson.specialConditions && lesson.specialConditions.length > 0 
-                              ? lesson.specialConditions.map(c => c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ') + ' '
-                              : ''
-                            }
-                            ({lesson.lessonsRemaining} {lesson.lessonsRemaining === 1 ? 'credit' : 'credits'})
+                            {lesson.lessonsRemaining} {lesson.lessonsRemaining === 1 ? 'credit' : 'credits'}
                           </p>
                           {lesson.horseName && (
                             <p className="lesson-horse">
@@ -948,9 +945,11 @@ function App() {
                       </div>
                       <div className="schedule-actions">
                         {(lesson.status === 'completed' || lesson.status === 'cancelled') && (
-                          <span className={`status-badge ${lesson.status}`}>
-                            {lesson.status === 'completed' ? 'Completed' : 'Cancelled'}
-                          </span>
+                          <div className="status-badge-wrapper">
+                            <span className={`status-badge ${lesson.status}`}>
+                              {lesson.status === 'completed' ? 'Completed' : 'Cancelled'}
+                            </span>
+                          </div>
                         )}
                         {lesson.status === 'scheduled' && (
                           <>
@@ -1316,34 +1315,26 @@ function App() {
       )}
 
       {showCheckInConfirm && (
-        <div className="modal-overlay" onClick={() => setShowCheckInConfirm(false)}>
-          <div className="modal-content confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Check Into Lesson</h2>
-              <button className="modal-close" onClick={() => setShowCheckInConfirm(false)}>&times;</button>
-            </div>
-            
-            <div className="modal-body">
+        <ConfirmModal
+          isOpen={showCheckInConfirm}
+          onClose={() => setShowCheckInConfirm(false)}
+          title="Check Into Lesson"
+          message={
+            <>
               <p>Checking into this lesson will mark it as completed and deduct <b>1 lesson credit</b>.</p>
               <br />
               <p>Are you sure?</p>
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" className="cancel-btn" onClick={() => setShowCheckInConfirm(false)}>
-                Cancel
-              </button>
-              <button type="button" className="submit-btn" onClick={confirmCheckIn}>
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          cancelLabel="Cancel"
+          confirmLabel="Yes"
+          onConfirm={confirmCheckIn}
+        />
       )}
 
       {showScheduleModal && studentToSchedule && (
         <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content schedule-lesson-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Schedule Lesson for {studentToSchedule.name}</h2>
               <button className="modal-close" onClick={() => setShowScheduleModal(false)}>&times;</button>
