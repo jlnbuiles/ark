@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCalendarDays, faUsers, faUserPlus, faMagnifyingGlass, faStickyNote, faHorseHead, faHorse, faChartLine, faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarDays, faUsers, faHorseHead, faChartLine, faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
 import SearchBox from './components/SearchBox';
 import ConfirmModal from './components/ConfirmModal';
 import ListView from './components/ListView';
 import Button from './components/Button';
+import StudentsTab from './modules/students/List';
+import HorsesTab from './modules/horses/List';
+import InstructorsTab from './modules/instructors/List';
+import ReportsTab from './modules/reports/List';
+import ScheduleTab from './modules/schedule/List';
+import CreateStudentModal from './modules/students/CreateModal';
+import ScheduleLessonModal from './modules/schedule/ScheduleModal';
+import CreateInstructorModal from './modules/instructors/CreateModal';
+import * as scheduleActions from './modules/schedule/actions';
+import * as studentActions from './modules/students/actions';
+import * as horseActions from './modules/horses/actions';
+import * as instructorActions from './modules/instructors/actions';
 import './App.css';
 
 const API_URL = 'http://localhost:3001/api';
@@ -54,12 +66,6 @@ function App() {
     instructorId: '',
     repeat: 'none'
   });
-  const [showHorseModal, setShowHorseModal] = useState(false);
-  const [editingHorse, setEditingHorse] = useState(null);
-  const [horseFormData, setHorseFormData] = useState({
-    name: '',
-    condition: 'great'
-  });
   const [studentFormData, setStudentFormData] = useState({
     name: '',
     dateOfBirth: '',
@@ -72,7 +78,6 @@ function App() {
     lessonsRemaining: ''
   });
   const [validationErrors, setValidationErrors] = useState({});
-  const [scheduleConflicts, setScheduleConflicts] = useState([]);
   const [showConflictWarning, setShowConflictWarning] = useState(false);
   const [availableDates, setAvailableDates] = useState([]);
   const [conflictingDates, setConflictingDates] = useState([]);
@@ -84,24 +89,20 @@ function App() {
 
   // Fetch students when search term or page changes
   useEffect(() => {
-    fetchStudents();
+    loadStudents();
   }, [searchTerm, currentPage]);
 
   // Fetch horses when component mounts
   useEffect(() => {
-    fetchHorses();
-    fetchHorseLessonCounts();
-    fetchTeachers();
+    loadHorses();
+    loadHorseLessonCounts();
+    loadTeachers();
   }, []);
 
-  const fetchStudents = async () => {
+  const loadStudents = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_URL}/students?search=${encodeURIComponent(searchTerm)}&page=${currentPage}&limit=${studentsPerPage}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch students');
-      const data = await response.json();
+      const data = await studentActions.fetchStudents(searchTerm, currentPage, studentsPerPage);
       setStudents(data.students);
       setTotalPages(data.totalPages);
       setTotalStudents(data.total);
@@ -114,34 +115,27 @@ function App() {
     }
   };
 
-  const fetchHorses = async () => {
+  const loadHorses = async () => {
     try {
-      const response = await fetch(`${API_URL}/horses`);
-      if (!response.ok) throw new Error('Failed to fetch horses');
-      const data = await response.json();
+      const data = await horseActions.fetchHorses();
       setHorses(data);
     } catch (err) {
       console.error('Error fetching horses:', err);
     }
   };
 
-  const fetchHorseLessonCounts = async () => {
+  const loadHorseLessonCounts = async () => {
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/horses/lesson-counts?date=${dateStr}`);
-      if (!response.ok) throw new Error('Failed to fetch horse lesson counts');
-      const data = await response.json();
+      const data = await horseActions.fetchHorseLessonCounts(selectedDate);
       setHorseLessonCounts(data);
     } catch (err) {
       console.error('Error fetching horse lesson counts:', err);
     }
   };
 
-  const fetchTeachers = async () => {
+  const loadTeachers = async () => {
     try {
-      const response = await fetch(`${API_URL}/teachers`);
-      if (!response.ok) throw new Error('Failed to fetch teachers');
-      const data = await response.json();
+      const data = await instructorActions.fetchInstructors();
       setTeachers(data);
     } catch (err) {
       console.error('Error fetching teachers:', err);
@@ -149,15 +143,7 @@ function App() {
   };
 
   const getStudentScheduledLessonsCount = async (studentId) => {
-    try {
-      const response = await fetch(`${API_URL}/students/${studentId}/scheduled-count`);
-      if (!response.ok) return 0;
-      const data = await response.json();
-      return data.count || 0;
-    } catch (err) {
-      console.error('Error fetching scheduled lessons count:', err);
-      return 0;
-    }
+    return await studentActions.getStudentScheduledCount(studentId);
   };
 
   const handleCheckIn = async (studentId) => {
@@ -255,28 +241,21 @@ function App() {
       for (const lessonDate of datesToSchedule) {
         const dateStr = lessonDate.toISOString().split('T')[0];
         
-        // Check availability by attempting to validate
-        const checkResponse = await fetch(`${API_URL}/lessons/check-availability`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            date: dateStr,
-            time: scheduleLessonForm.time,
-            horseId: parseInt(scheduleLessonForm.horseId),
-            instructorId: parseInt(scheduleLessonForm.instructorId)
-          }),
-        });
+        // Check availability
+        const isAvailable = await scheduleActions.checkLessonAvailability(
+          dateStr,
+          scheduleLessonForm.time,
+          parseInt(scheduleLessonForm.horseId),
+          parseInt(scheduleLessonForm.instructorId)
+        );
         
-        if (checkResponse.ok) {
+        if (isAvailable) {
           available.push({ date: dateStr, formatted: lessonDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) });
         } else {
-          const error = await checkResponse.json();
           conflicts.push({ 
             date: dateStr, 
             formatted: lessonDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-            reason: error.error 
+            reason: 'Time slot not available'
           });
         }
       }
@@ -305,12 +284,8 @@ function App() {
       
       const scheduledCount = [];
       for (const dateInfo of datesToSchedule) {
-        const response = await fetch(`${API_URL}/lessons`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        try {
+          await scheduleActions.scheduleLesson({
             date: dateInfo.date,
             time: scheduleLessonForm.time,
             studentId: studentToSchedule.id,
@@ -321,14 +296,10 @@ function App() {
             instructorName: `${instructor?.firstName} ${instructor?.lastName}`,
             lessonsRemaining: studentToSchedule.lessonsRemaining,
             specialConditions: studentToSchedule.specialConditions || []
-          }),
-        });
-
-        if (response.ok) {
+          });
           scheduledCount.push(dateInfo.date);
-        } else {
-          const error = await response.json();
-          console.warn(`Failed to schedule lesson on ${dateInfo.date}:`, error.error);
+        } catch (err) {
+          console.warn(`Failed to schedule lesson on ${dateInfo.date}:`, err.message);
         }
       }
 
@@ -347,10 +318,10 @@ function App() {
       setConflictingDates([]);
       
       // Refresh students list to show updated available lessons
-      await fetchStudents();
+      await loadStudents();
       
       if (activeTab === 'schedule') {
-        fetchSchedule(selectedDate);
+        loadSchedule(selectedDate);
       }
       
       if (scheduledCount.length > 0) {
@@ -386,22 +357,10 @@ function App() {
     try {
       const newTotal = studentForCredits.lessonsRemaining + creditsToAdd;
       
-      const response = await fetch(`${API_URL}/students/${studentForCredits.id}/credits`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          creditsToAdd: creditsToAdd
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update credits');
-      }
+      await studentActions.updateStudentCredits(studentForCredits.id, creditsToAdd);
 
       // Refresh students list
-      await fetchStudents();
+      await loadStudents();
       
       // Close modal
       setShowCreditsModal(false);
@@ -475,40 +434,7 @@ function App() {
   };
 
   const validateStudentForm = () => {
-    const errors = {};
-    
-    if (!studentFormData.name.trim()) {
-      errors.name = 'Name is required';
-    }
-    
-    if (!studentFormData.dateOfBirth) {
-      errors.dateOfBirth = 'Date of birth is required';
-    }
-    
-    if (!studentFormData.guardianName.trim()) {
-      errors.guardianName = 'Guardian name is required';
-    }
-    
-    if (!studentFormData.guardianEmail.trim()) {
-      errors.guardianEmail = 'Guardian email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentFormData.guardianEmail)) {
-      errors.guardianEmail = 'Please enter a valid email address';
-    }
-    
-    if (!studentFormData.guardianPhone.trim()) {
-      errors.guardianPhone = 'Guardian phone is required';
-    } else if (!/^[\d\s\-\(\)\+]+$/.test(studentFormData.guardianPhone)) {
-      errors.guardianPhone = 'Please enter a valid phone number';
-    }
-    
-    if (!studentFormData.guardianAddress.trim()) {
-      errors.guardianAddress = 'Guardian address is required';
-    }
-    
-    if (!studentFormData.lessonsRemaining || parseInt(studentFormData.lessonsRemaining) < 1) {
-      errors.lessonsRemaining = 'Please enter a valid number of lessons (minimum 1)';
-    }
-    
+    const errors = studentActions.validateStudentForm(studentFormData);
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -521,18 +447,10 @@ function App() {
     }
     
     try {
-      const response = await fetch(`${API_URL}/students`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...studentFormData,
-          lessonsRemaining: parseInt(studentFormData.lessonsRemaining)
-        }),
+      await studentActions.createStudent({
+        ...studentFormData,
+        lessonsRemaining: parseInt(studentFormData.lessonsRemaining)
       });
-
-      if (!response.ok) throw new Error('Failed to add student');
 
       // Reset form and close modal
       setStudentFormData({
@@ -548,7 +466,7 @@ function App() {
       });
       setValidationErrors({});
       setShowModal(false);
-      fetchStudents();
+      loadStudents();
       alert('Student added successfully!');
     } catch (err) {
       alert(err.message);
@@ -558,9 +476,7 @@ function App() {
 
   const handleStudentClick = async (studentId) => {
     try {
-      const response = await fetch(`${API_URL}/students/${studentId}`);
-      if (!response.ok) throw new Error('Failed to fetch student details');
-      const studentData = await response.json();
+      const studentData = await studentActions.fetchStudentDetails(studentId);
       setSelectedStudent(studentData);
       setShowStudentDetails(true);
     } catch (err) {
@@ -571,9 +487,7 @@ function App() {
 
   const handleInstructorClick = async (instructorId) => {
     try {
-      const response = await fetch(`${API_URL}/teachers/${instructorId}`);
-      if (!response.ok) throw new Error('Failed to fetch instructor details');
-      const instructorData = await response.json();
+      const instructorData = await instructorActions.fetchInstructorDetails(instructorId);
       setSelectedInstructor(instructorData);
       setShowInstructorDetails(true);
     } catch (err) {
@@ -599,18 +513,7 @@ function App() {
     }
     
     try {
-      const response = await fetch(`${API_URL}/teachers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...instructorFormData,
-          experience: parseInt(instructorFormData.experience)
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to create instructor');
+      await instructorActions.createInstructor(instructorFormData);
 
       // Reset form and close modal
       setInstructorFormData({
@@ -623,7 +526,7 @@ function App() {
         phone: ''
       });
       setShowInstructorModal(false);
-      fetchTeachers();
+      loadTeachers();
       alert('Instructor created successfully!');
     } catch (err) {
       alert(err.message);
@@ -656,7 +559,7 @@ function App() {
       // Reset form and switch to home tab
       setFormData({ name: '', lessonsRemaining: '' });
       setActiveTab('home');
-      fetchStudents(); // Refresh the list
+      loadStudents(); // Refresh the list
       alert('Student added successfully!');
     } catch (err) {
       alert(err.message);
@@ -664,13 +567,10 @@ function App() {
     }
   };
 
-  const fetchSchedule = async (date) => {
+  const loadSchedule = async (date) => {
     try {
       setLoading(true);
-      const dateStr = date.toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/schedule?date=${dateStr}`);
-      if (!response.ok) throw new Error('Failed to fetch schedule');
-      const data = await response.json();
+      const data = await scheduleActions.fetchSchedule(date);
       setScheduledLessons(data);
       setError(null);
     } catch (err) {
@@ -683,7 +583,7 @@ function App() {
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
-    fetchSchedule(date);
+    loadSchedule(date);
   };
 
   const handleLessonCheckIn = async (lesson) => {
@@ -695,25 +595,14 @@ function App() {
     if (!lastCheckedInLesson) return;
     
     try {
-      const response = await fetch(`${API_URL}/lessons/undo-checkin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          date: lastCheckedInLesson.date,
-          time: lastCheckedInLesson.time,
-          studentId: lastCheckedInLesson.studentId
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to undo check-in');
-      }
+      await scheduleActions.undoLessonCheckIn(
+        lastCheckedInLesson.date,
+        lastCheckedInLesson.time,
+        lastCheckedInLesson.studentId
+      );
 
       // Refresh the schedule and hide toast
-      fetchSchedule(selectedDate);
+      loadSchedule(selectedDate);
       setShowToast(false);
       setLastCheckedInLesson(null);
     } catch (err) {
@@ -724,34 +613,20 @@ function App() {
 
   const confirmCheckIn = async () => {
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/lessons/checkin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          date: dateStr,
-          time: lessonToCheckIn.time,
-          studentId: lessonToCheckIn.studentId
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to check in');
-      }
-
-      const result = await response.json();
+      await scheduleActions.checkInLesson(
+        selectedDate,
+        lessonToCheckIn.time,
+        lessonToCheckIn.studentId
+      );
       
       // Refresh the schedule
-      fetchSchedule(selectedDate);
+      loadSchedule(selectedDate);
       setShowCheckInConfirm(false);
       
       // Store the checked-in lesson for undo and show toast
       setLastCheckedInLesson({
         ...lessonToCheckIn,
-        date: dateStr
+        date: selectedDate.toISOString().split('T')[0]
       });
       setLessonToCheckIn(null);
       setShowToast(true);
@@ -772,13 +647,13 @@ function App() {
     if (newTime) {
       alert(`Lesson rescheduled to ${newTime}`);
       // Refresh the schedule
-      fetchSchedule(selectedDate);
+      loadSchedule(selectedDate);
     }
   };
 
   useEffect(() => {
     if (activeTab === 'schedule') {
-      fetchSchedule(selectedDate);
+      loadSchedule(selectedDate);
     }
   }, [activeTab]);
 
@@ -795,7 +670,7 @@ function App() {
       <div className="app">
         <div className="error">
           Error: {error}
-          <button onClick={fetchStudents}>Retry</button>
+          <button onClick={loadStudents}>Retry</button>
         </div>
       </div>
     );
@@ -847,575 +722,88 @@ function App() {
         </nav>
 
         {activeTab === 'home' ? (
-          <ListView
-            icon={<FontAwesomeIcon icon={faUsers} style={{ marginRight: '10px' }} />}
-            title="Students"
-            searchBar={
-              <SearchBox 
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search students by name..."
-              />
-            }
-            createButton={
-              <Button variant="blue" onClick={() => setShowModal(true)}>
-                + Create
-              </Button>
-            }
+          <StudentsTab
+            students={students}
             loading={loading}
-            isEmpty={students.length === 0}
-            emptyMessage="No students found"
-            pagination={totalPages > 1 && (
-              <div className="pagination">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="pagination-btn"
-                >
-                  Previous
-                </button>
-                
-                <div className="pagination-info">
-                  Page {currentPage} of {totalPages}
-                </div>
-                
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="pagination-btn"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          >
-            {students.map(student => (
-              <div key={student.id} className="student-card" onClick={() => handleStudentClick(student.id)}>
-                <div className="student-info">
-                  <div className="student-avatar">
-                    {student.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div className="student-details">
-                    <h3 className="student-name">
-                      {student.name}
-                      {student.notes && (
-                        <FontAwesomeIcon icon={faStickyNote} className="notes-icon" title="Has notes" />
-                      )}
-                    </h3>
-                    <div className="lessons-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-                      <span className={`lessons-badge ${(student.unscheduledLessons ?? student.lessonsRemaining) <= 3 ? 'low' : ''}`}>
-                        {student.unscheduledLessons ?? student.lessonsRemaining} unscheduled {(student.unscheduledLessons ?? student.lessonsRemaining) === 1 ? 'lesson' : 'lessons'}
-                      </span>
-                      <span style={{ color: '#6b7280', fontSize: '0.85rem', paddingLeft: '12px' }}>
-                        {student.lessonsRemaining} total {student.lessonsRemaining === 1 ? 'credit' : 'credits'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <Button
-                    variant="blue"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCheckIn(student.id);
-                    }}
-                    disabled={student.lessonsRemaining === 0}
-                  >
-                    {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
-                  </Button>
-                  <Button
-                    variant="success"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenCreditsModal(student);
-                    }}
-                  >
-                    Credits +
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </ListView>
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onCreateClick={() => setShowModal(true)}
+            onStudentClick={handleStudentClick}
+            onScheduleLesson={handleCheckIn}
+            onAddCredits={handleOpenCreditsModal}
+          />
         ) : activeTab === 'registration' ? (
-          <ListView
-            icon={<FontAwesomeIcon icon={faHorseHead} style={{ marginRight: '10px' }} />}
-            title="Horses"
-            searchBar={
-              <SearchBox 
-                value={horseSearchTerm}
-                onChange={handleHorseSearchChange}
-                placeholder="Search horses by name..."
-              />
-            }
-            createButton={
-              <Button variant="blue" onClick={() => setShowHorseModal(true)}>
-                + Create
-              </Button>
-            }
+          <HorsesTab
+            horses={horses}
             loading={loading}
-            isEmpty={horses.filter(horse => 
-              horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
-            ).length === 0}
-            emptyMessage="No horses found"
-            extraHeader={
-              <div className="horses-header">
-                <span className="horses-header-label">Condition</span>
-              </div>
-            }
-          >
-            {horses.filter(horse => 
-              horse.name.toLowerCase().includes(horseSearchTerm.toLowerCase())
-            ).map(horse => {
-              const lessonCount = horseLessonCounts.find(h => h.horseId === horse.id)?.count || 0;
-              return (
-                <div key={horse.id} className="student-card">
-                  <div className="student-info">
-                    <div className="student-avatar">
-                      {horse.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="student-details">
-                      <h3 className="student-name">{horse.name}</h3>
-                      <div className="lessons-info">
-                        <span className="lessons-badge">
-                          {horse.ridingStyle} · {horse.difficultyLevel}
-                        </span>
-                        <span className={`lessons-badge ${lessonCount >= 3 ? 'low' : ''}`} style={{ marginLeft: '8px' }}>
-                          {lessonCount} {lessonCount === 1 ? 'lesson' : 'lessons'} today
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <span className={`lessons-badge ${horse.condition.toLowerCase()}`}>
-                    {horse.condition}
-                  </span>
-                </div>
-              );
-            })}
-          </ListView>
+            searchTerm={horseSearchTerm}
+            onSearchChange={handleHorseSearchChange}
+            onCreateClick={() => setShowHorseModal(true)}
+            horseLessonCounts={horseLessonCounts}
+          />
         ) : activeTab === 'reports' ? (
-          <div className="reports-view">
-            <h2 className="form-title">
-              <FontAwesomeIcon icon={faChartLine} style={{ marginRight: '10px' }} />
-              Reports
-            </h2>
-            
-            <div className="stats">
-              <div className="stat-card">
-                <span className="stat-number">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                <span className="stat-label">Today's Date</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number">{totalStudents}</span>
-                <span className="stat-label">Total Students</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number">
-                  {students.reduce((sum, student) => sum + student.lessonsRemaining, 0)}
-                </span>
-                <span className="stat-label">Current Page Lessons</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number">24</span>
-                <span className="stat-label">Lessons This Week</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number">97</span>
-                <span className="stat-label">Lessons This Month</span>
-              </div>
-            </div>
-          </div>
+          <ReportsTab
+            students={students}
+            totalStudents={totalStudents}
+          />
         ) : activeTab === 'teachers' ? (
-          <ListView
-            icon={<FontAwesomeIcon icon={faChalkboardTeacher} style={{ marginRight: '10px' }} />}
-            title="Instructors"
-            searchBar={
-              <SearchBox 
-                value={teacherSearchTerm}
-                onChange={handleTeacherSearchChange}
-                placeholder="Search instructors by name..."
-              />
-            }
-            createButton={
-              <Button variant="blue" onClick={() => setShowInstructorModal(true)}>
-                + Create
-              </Button>
-            }
+          <InstructorsTab
+            teachers={teachers}
             loading={loading}
-            isEmpty={teachers.filter(teacher => {
-              const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-              return fullName.includes(teacherSearchTerm.toLowerCase());
-            }).length === 0}
-            emptyMessage="No instructors found"
-          >
-            {teachers.filter(teacher => {
-              const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-              return fullName.includes(teacherSearchTerm.toLowerCase());
-            }).map(teacher => (
-              <div key={teacher.id} className="student-card" onClick={() => handleInstructorClick(teacher.id)}>
-                <div className="student-info">
-                  <div className="student-avatar">
-                    {teacher.firstName[0]}{teacher.lastName[0]}
-                  </div>
-                  <div className="student-details">
-                    <h3 className="student-name">{teacher.firstName} {teacher.lastName}</h3>
-                    <div className="lessons-info">
-                      <span className="lessons-badge">
-                        {teacher.specialty}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <span className="lessons-badge">
-                  {teacher.experience} years
-                </span>
-              </div>
-            ))}
-          </ListView>
+            searchTerm={teacherSearchTerm}
+            onSearchChange={handleTeacherSearchChange}
+            onCreateClick={() => setShowInstructorModal(true)}
+            onInstructorClick={handleInstructorClick}
+          />
         ) : activeTab === 'schedule' ? (
-          <ListView
-            icon={<FontAwesomeIcon icon={faCalendarDays} style={{ marginRight: '10px' }} />}
-            title="Schedule"
-            extraHeader={
-              <div className="date-selector">
-                <div className="date-nav-group">
-                  <button 
-                      onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() - 1)))}
-                      className="date-nav-btn"
-                    >
-                      ← Previous
-                    </button>
-                    <div className="current-date">
-                      {selectedDate.toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
-                    </div>
-                    <button 
-                      onClick={() => handleDateChange(new Date(selectedDate.setDate(selectedDate.getDate() + 1)))}
-                      className="date-nav-btn"
-                    >
-                      Next →
-                    </button>
-                  </div>
-                  <button 
-                    onClick={() => handleDateChange(new Date())}
-                    className="today-btn"
-                  >
-                    Go to Today
-                  </button>
-                </div>
-            }
+          <ScheduleTab
+            scheduledLessons={scheduledLessons}
             loading={loading}
-            isEmpty={scheduledLessons.length === 0}
-            emptyMessage="No lessons scheduled for this day"
-          >
-            {scheduledLessons.map((lesson, index) => (
-              <div key={index} className="schedule-card">
-                <div className="schedule-time">{lesson.time}</div>
-                <div className="schedule-details">
-                  <div className="schedule-student">
-                    <div className="student-avatar">
-                      {lesson.studentName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <h3 className="student-name">{lesson.studentName}</h3>
-                      <p className={`lesson-type ${lesson.lessonsRemaining < 3 ? 'low-credit' : ''}`}>
-                        {lesson.lessonsRemaining < 3 && (
-                          <span className="warning-icon">⚠️</span>
-                        )}
-                        {lesson.lessonsRemaining} {lesson.lessonsRemaining === 1 ? 'credit' : 'credits'}
-                      </p>
-                      {lesson.horseName && (
-                        <p className="lesson-horse">
-                          <FontAwesomeIcon icon={faHorse} className="horse-icon-small" /> {lesson.horseName}
-                        </p>
-                      )}
-                      {lesson.instructorName && (
-                        <p className="lesson-instructor">
-                          <FontAwesomeIcon icon={faChalkboardTeacher} className="instructor-icon-small" /> {lesson.instructorName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="schedule-actions">
-                    {(lesson.status === 'completed' || lesson.status === 'cancelled') && (
-                      <div className="status-badge-wrapper">
-                        <span className={`status-badge ${lesson.status}`}>
-                          {lesson.status === 'completed' ? 'Completed' : 'Cancelled'}
-                        </span>
-                      </div>
-                    )}
-                    {lesson.status === 'scheduled' && (
-                      <>
-                        <Button 
-                          variant="primary"
-                          onClick={() => handleLessonCheckIn(lesson)}
-                        >
-                          Check In
-                        </Button>
-                        <Button 
-                          variant="secondary"
-                          onClick={() => handleRescheduleLesson(lesson)}
-                        >
-                          Reschedule
-                        </Button>
-                      </>
-                    )}
-                    {lesson.lessonsRemaining < 3 && (
-                      <Button variant="warning">
-                        Renew
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </ListView>
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+            onLessonCheckIn={handleLessonCheckIn}
+            onRescheduleLesson={handleRescheduleLesson}
+          />
         ) : null}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Create New Student</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>&times;</button>
-            </div>
-            
-            <form onSubmit={handleCreateStudent} className="student-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="name">Student Name *</label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={studentFormData.name}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.name ? 'error' : ''}`}
-                    placeholder="Enter student name"
-                  />
-                </div>
+      <CreateStudentModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        formData={studentFormData}
+        validationErrors={validationErrors}
+        onFormChange={handleStudentFormChange}
+        onSpecialConditionsChange={handleSpecialConditionsChange}
+        onSubmit={handleCreateStudent}
+      />
 
-                <div className="form-group">
-                  <label htmlFor="dateOfBirth">Date of Birth *</label>
-                  <input
-                    type="date"
-                    id="dateOfBirth"
-                    name="dateOfBirth"
-                    value={studentFormData.dateOfBirth}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.dateOfBirth ? 'error' : ''}`}
-                  />
-                </div>
-              </div>
+      <ScheduleLessonModal
+        isOpen={showScheduleModal}
+        student={studentToSchedule}
+        formData={scheduleLessonForm}
+        horses={horses}
+        teachers={teachers}
+        studentScheduledCount={studentScheduledCount}
+        showConflictWarning={showConflictWarning}
+        conflictingDates={conflictingDates}
+        availableDates={availableDates}
+        onClose={() => setShowScheduleModal(false)}
+        onFormChange={handleScheduleLessonFormChange}
+        onSubmit={handleScheduleLessonSubmit}
+        onCancelSchedule={handleCancelSchedule}
+        onConfirmWithConflicts={handleConfirmScheduleWithConflicts}
+      />
 
-              <div className="form-group">
-                <label>Special Conditions</label>
-                <div className="checkbox-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="autism"
-                      checked={studentFormData.specialConditions.includes('autism')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Autism</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="adhd"
-                      checked={studentFormData.specialConditions.includes('adhd')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>ADHD</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="anxiety"
-                      checked={studentFormData.specialConditions.includes('anxiety')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Anxiety</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="dyslexia"
-                      checked={studentFormData.specialConditions.includes('dyslexia')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Dyslexia</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="hearing_impaired"
-                      checked={studentFormData.specialConditions.includes('hearing_impaired')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Hearing Impaired</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="vision_impaired"
-                      checked={studentFormData.specialConditions.includes('vision_impaired')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Vision Impaired</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="mobility_issues"
-                      checked={studentFormData.specialConditions.includes('mobility_issues')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Mobility Issues</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="allergies"
-                      checked={studentFormData.specialConditions.includes('allergies')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Allergies</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="specialConditions"
-                      value="other"
-                      checked={studentFormData.specialConditions.includes('other')}
-                      onChange={handleSpecialConditionsChange}
-                    />
-                    <span>Other</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="notes">Notes</label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={studentFormData.notes}
-                  onChange={handleStudentFormChange}
-                  className="form-textarea"
-                  placeholder="Any additional notes about the student"
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-divider">Guardian Information</div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="guardianName">Guardian Name *</label>
-                  <input
-                    type="text"
-                    id="guardianName"
-                    name="guardianName"
-                    value={studentFormData.guardianName}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.guardianName ? 'error' : ''}`}
-                    placeholder="Enter guardian name"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="guardianEmail">Guardian Email *</label>
-                  <input
-                    type="email"
-                    id="guardianEmail"
-                    name="guardianEmail"
-                    value={studentFormData.guardianEmail}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.guardianEmail ? 'error' : ''}`}
-                    placeholder="guardian@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="guardianPhone">Guardian Phone *</label>
-                  <input
-                    type="tel"
-                    id="guardianPhone"
-                    name="guardianPhone"
-                    value={studentFormData.guardianPhone}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.guardianPhone ? 'error' : ''}`}
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="lessonsRemaining">Number of Lessons *</label>
-                  <input
-                    type="number"
-                    id="lessonsRemaining"
-                    name="lessonsRemaining"
-                    value={studentFormData.lessonsRemaining}
-                    onChange={handleStudentFormChange}
-                    className={`form-input ${validationErrors.lessonsRemaining ? 'error' : ''}`}
-                    placeholder="8"
-                    min="1"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="guardianAddress">Guardian Address *</label>
-                <textarea
-                  id="guardianAddress"
-                  name="guardianAddress"
-                  value={studentFormData.guardianAddress}
-                  onChange={handleStudentFormChange}
-                  className={`form-textarea ${validationErrors.guardianAddress ? 'error' : ''}`}
-                  placeholder="Enter full address"
-                  rows="2"
-                />
-              </div>
-
-              {Object.keys(validationErrors).length > 0 && (
-                <div className="validation-error">
-                  <strong>Please fix the following errors:</strong>
-                  <ul>
-                    {Object.entries(validationErrors).map(([field, error]) => (
-                      error && <li key={field}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="submit-btn">
-                  Create Student
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateInstructorModal
+        isOpen={showInstructorModal}
+        formData={instructorFormData}
+        onClose={() => setShowInstructorModal(false)}
+        onFormChange={handleInstructorFormChange}
+        onSubmit={handleCreateInstructor}
+      />
 
       {showStudentDetails && selectedStudent && (
         <div className="modal-overlay" onClick={() => setShowStudentDetails(false)}>
@@ -1526,169 +914,6 @@ function App() {
         />
       )}
 
-      {showScheduleModal && studentToSchedule && (
-        <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
-          <div className="modal-content schedule-lesson-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Schedule Lesson</h2>
-              <button className="modal-close" onClick={() => setShowScheduleModal(false)}>&times;</button>
-            </div>
-            
-            <form onSubmit={handleScheduleLessonSubmit} className="student-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="date">Date *</label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={scheduleLessonForm.date}
-                    onChange={handleScheduleLessonFormChange}
-                    className="form-input"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="time">Time *</label>
-                  <input
-                    type="time"
-                    id="time"
-                    name="time"
-                    value={scheduleLessonForm.time}
-                    onChange={handleScheduleLessonFormChange}
-                    className="form-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="horseId">Horse *</label>
-                  <select
-                    id="horseId"
-                    name="horseId"
-                    value={scheduleLessonForm.horseId}
-                    onChange={handleScheduleLessonFormChange}
-                    className="form-input"
-                    required
-                  >
-                    <option value="">Select a horse</option>
-                    {horses.map(horse => (
-                      <option key={horse.id} value={horse.id}>
-                        {horse.name} - {horse.ridingStyle} ({horse.difficultyLevel})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="instructorId">Instructor *</label>
-                  <select
-                    id="instructorId"
-                    name="instructorId"
-                    value={scheduleLessonForm.instructorId}
-                    onChange={handleScheduleLessonFormChange}
-                    className="form-input"
-                    required
-                  >
-                    <option value="">Select an instructor</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.firstName} {teacher.lastName} - {teacher.specialty}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="repeat">Repeat</label>
-                  <select
-                    id="repeat"
-                    name="repeat"
-                    value={scheduleLessonForm.repeat}
-                    onChange={handleScheduleLessonFormChange}
-                    className="form-input"
-                  >
-                    <option value="none">None</option>
-                    <option value="weekly">
-                      Every Week ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
-                    </option>
-                    <option value="biweekly">
-                      Every 2 Weeks ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
-                    </option>
-                    <option value="monthly">
-                      Every 4 Weeks ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              {showConflictWarning && (
-                <div className="conflict-warning">
-                  <h3 style={{ color: '#dc2626', marginBottom: '10px' }}>⚠️ Scheduling Conflicts Detected</h3>
-                  
-                  {conflictingDates.length > 0 && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <strong>Unavailable Dates:</strong>
-                      <ul style={{ marginTop: '5px', marginLeft: '20px' }}>
-                        {conflictingDates.map((conflict, idx) => (
-                          <li key={idx} style={{ color: '#dc2626', marginBottom: '5px' }}>
-                            {conflict.formatted} - {conflict.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {availableDates.length > 0 && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <strong style={{ color: '#059669' }}>Available Dates ({availableDates.length}):</strong>
-                      <ul style={{ marginTop: '5px', marginLeft: '20px' }}>
-                        {availableDates.map((dateInfo, idx) => (
-                          <li key={idx} style={{ color: '#059669', marginBottom: '5px' }}>
-                            {dateInfo.formatted}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  <p style={{ marginTop: '15px', fontSize: '0.9rem', color: '#6b7280' }}>
-                    Would you like to schedule the {availableDates.length} available lesson(s)?
-                  </p>
-                </div>
-              )}
-
-              <div className="modal-actions">
-                {showConflictWarning ? (
-                  <>
-                    <button type="button" className="cancel-btn" onClick={handleCancelSchedule}>
-                      Cancel
-                    </button>
-                    <button type="button" className="submit-btn" onClick={handleConfirmScheduleWithConflicts}>
-                      Schedule {availableDates.length} Lesson(s)
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" className="cancel-btn" onClick={() => setShowScheduleModal(false)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="submit-btn">
-                      Confirm
-                    </button>
-                  </>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       <ConfirmModal
         isOpen={showCreditsModal && studentForCredits}
         onClose={() => setShowCreditsModal(false)}
@@ -1779,128 +1004,6 @@ function App() {
           </div>
         }
       />
-
-      {showInstructorModal && (
-        <div className="modal-overlay" onClick={() => setShowInstructorModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Create New Instructor</h2>
-              <button className="modal-close" onClick={() => setShowInstructorModal(false)}>&times;</button>
-            </div>
-            
-            <form onSubmit={handleCreateInstructor} className="student-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="firstName">First Name *</label>
-                  <input
-                    type="text"
-                    id="firstName"
-                    name="firstName"
-                    value={instructorFormData.firstName}
-                    onChange={handleInstructorFormChange}
-                    className="form-input"
-                    placeholder="Enter first name"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="lastName">Last Name *</label>
-                  <input
-                    type="text"
-                    id="lastName"
-                    name="lastName"
-                    value={instructorFormData.lastName}
-                    onChange={handleInstructorFormChange}
-                    className="form-input"
-                    placeholder="Enter last name"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="specialty">Specialty *</label>
-                  <input
-                    type="text"
-                    id="specialty"
-                    name="specialty"
-                    value={instructorFormData.specialty}
-                    onChange={handleInstructorFormChange}
-                    className="form-input"
-                    placeholder="e.g., English Riding, Dressage"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="experience">Years of Experience *</label>
-                  <input
-                    type="number"
-                    id="experience"
-                    name="experience"
-                    value={instructorFormData.experience}
-                    onChange={handleInstructorFormChange}
-                    className="form-input"
-                    placeholder="Enter years"
-                    min="0"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="certification">Certification</label>
-                <input
-                  type="text"
-                  id="certification"
-                  name="certification"
-                  value={instructorFormData.certification}
-                  onChange={handleInstructorFormChange}
-                  className="form-input"
-                  placeholder="e.g., Level 3 Instructor, PATH Certified"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="phone">Phone Number</label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={instructorFormData.phone}
-                  onChange={handleInstructorFormChange}
-                  className="form-input"
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="address">Address</label>
-                <textarea
-                  id="address"
-                  name="address"
-                  value={instructorFormData.address}
-                  onChange={handleInstructorFormChange}
-                  className="form-textarea"
-                  placeholder="Enter full address"
-                  rows="2"
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setShowInstructorModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="submit-btn">
-                  Confirm
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {showInstructorDetails && selectedInstructor && (
         <div className="modal-overlay" onClick={() => setShowInstructorDetails(false)}>

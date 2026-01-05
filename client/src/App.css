@@ -883,14 +883,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 30px;
+  padding: 30px;
+  padding-bottom: 24px;
   border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
   font-size: 1.6rem;
   color: #1f2937;
   margin: 0;
+  font-weight: 600;
 }
 
 .modal-close {
@@ -915,7 +918,8 @@
   color: #1f2937;
 }
 
-.student-form {
+.student-form,
+.modal-body {
   padding: 30px;
 }
 
@@ -1058,22 +1062,36 @@
 .modal-actions {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-top: 30px;
-  padding-top: 20px;
+  padding: 20px 30px 30px 30px;
   border-top: 2px solid #e5e7eb;
 }
 
-.cancel-btn {
-  padding: 12px 24px;
-  background: white;
-  color: #6b7280;
-  border: 2px solid #d1d5db;
+.cancel-btn,
+.submit-btn {
+  flex: 0 0 auto;
+  width: 140px;
+  height: 48px;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.cancel-btn {
+  background: white;
+  color: #6b7280;
+  border-color: #d1d5db;
 }
 
 .cancel-btn:hover {
@@ -1088,10 +1106,6 @@
   flex-direction: column;
 }
 
-.confirm-modal .modal-header {
-  flex-shrink: 0;
-}
-
 .confirm-modal .modal-body {
   padding: 30px;
   padding-bottom: 20px;
@@ -1102,66 +1116,10 @@
 }
 
 .confirm-modal .modal-actions {
-  padding: 30px;
-  margin-top: 0;
   border-top: none;
-  justify-content: flex-start;
-  flex-shrink: 0;
-  align-items: center;
 }
 
-.confirm-modal .cancel-btn,
-.confirm-modal .submit-btn {
-  flex: 0 0 auto;
-  width: 140px;
-  height: 48px;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid transparent;
-  vertical-align: middle;
-  line-height: 1;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
 
-.confirm-modal .cancel-btn {
-  border-color: #d1d5db;
-}
-
-.schedule-lesson-modal .modal-actions {
-  padding: 30px;
-  margin-top: 0;
-  border-top: 2px solid #e5e7eb;
-  padding-top: 20px;
-  justify-content: flex-start;
-  align-items: center;
-}
-
-.schedule-lesson-modal .cancel-btn,
-.schedule-lesson-modal .submit-btn {
-  flex: 0 0 auto;
-  width: 140px;
-  height: 48px;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid transparent;
-  vertical-align: middle;
-  line-height: 1;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.schedule-lesson-modal .cancel-btn {
-  border-color: #d1d5db;
-}
 
 .conflict-warning {
   background: #fef2f2;
