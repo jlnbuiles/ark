@@ -688,6 +688,40 @@
 .renew-btn-small:active {
   transform: translateY(0);
 }
+
+.credits-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  min-width: 120px;
+}
+
+.credits-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.credits-btn:active {
+  transform: translateY(0);
+}
+
+.counter-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.counter-btn:active {
+  background: #e5e7eb;
+}
+
 .renew-btn-small {
   padding: 8px 16px;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);

@@ -76,6 +76,9 @@ function App() {
   const [availableDates, setAvailableDates] = useState([]);
   const [conflictingDates, setConflictingDates] = useState([]);
   const [studentScheduledCount, setStudentScheduledCount] = useState(0);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [studentForCredits, setStudentForCredits] = useState(null);
+  const [creditsToAdd, setCreditsToAdd] = useState(0);
   const studentsPerPage = 10;
 
   // Fetch students when search term or page changes
@@ -368,6 +371,47 @@ function App() {
     setShowConflictWarning(false);
     setAvailableDates([]);
     setConflictingDates([]);
+  };
+
+  const handleOpenCreditsModal = (student) => {
+    setStudentForCredits(student);
+    setCreditsToAdd(0);
+    setShowCreditsModal(true);
+  };
+
+  const handleSaveCredits = async () => {
+    if (!studentForCredits) return;
+
+    try {
+      const newTotal = studentForCredits.lessonsRemaining + creditsToAdd;
+      
+      const response = await fetch(`${API_URL}/students/${studentForCredits.id}/credits`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          creditsToAdd: creditsToAdd
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update credits');
+      }
+
+      // Refresh students list
+      await fetchStudents();
+      
+      // Close modal
+      setShowCreditsModal(false);
+      setStudentForCredits(null);
+      setCreditsToAdd(0);
+      
+      alert(`Successfully updated credits to ${newTotal}!`);
+    } catch (err) {
+      alert(err.message);
+      console.error('Error updating credits:', err);
+    }
   };
 
   const handleSearchChange = (e) => {
@@ -857,23 +901,37 @@ function App() {
                         <FontAwesomeIcon icon={faStickyNote} className="notes-icon" title="Has notes" />
                       )}
                     </h3>
-                    <div className="lessons-info">
+                    <div className="lessons-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
                       <span className={`lessons-badge ${(student.unscheduledLessons ?? student.lessonsRemaining) <= 3 ? 'low' : ''}`}>
                         {student.unscheduledLessons ?? student.lessonsRemaining} unscheduled {(student.unscheduledLessons ?? student.lessonsRemaining) === 1 ? 'lesson' : 'lessons'}
+                      </span>
+                      <span style={{ color: '#6b7280', fontSize: '0.85rem', paddingLeft: '12px' }}>
+                        {student.lessonsRemaining} total {student.lessonsRemaining === 1 ? 'credit' : 'credits'}
                       </span>
                     </div>
                   </div>
                 </div>
-                <button
-                  className="check-in-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCheckIn(student.id);
-                  }}
-                  disabled={student.lessonsRemaining === 0}
-                >
-                  {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    className="check-in-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCheckIn(student.id);
+                    }}
+                    disabled={student.lessonsRemaining === 0}
+                  >
+                    {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
+                  </button>
+                  <button
+                    className="credits-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCreditsModal(student);
+                    }}
+                  >
+                    Credits +
+                  </button>
+                </div>
               </div>
             ))}
           </ListView>
@@ -1471,7 +1529,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
           <div className="modal-content schedule-lesson-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Schedule Lesson for {studentToSchedule.name}</h2>
+              <h2>Schedule Lesson</h2>
               <button className="modal-close" onClick={() => setShowScheduleModal(false)}>&times;</button>
             </div>
             
@@ -1629,6 +1687,97 @@ function App() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={showCreditsModal && studentForCredits}
+        onClose={() => setShowCreditsModal(false)}
+        title="Add Credits"
+        confirmLabel="Save"
+        cancelLabel="Cancel"
+        onConfirm={handleSaveCredits}
+        message={
+          <div style={{ padding: '10px 0' }}>
+            <div style={{ marginBottom: '30px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '8px' }}>
+                Current Credits
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937' }}>
+                {studentForCredits?.lessonsRemaining}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.95rem', fontWeight: '600', color: '#374151' }}>
+                Credits to Add/Remove
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCreditsToAdd(prev => prev - 1)}
+                  disabled={creditsToAdd <= 0}
+                  className="counter-btn"
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    fontSize: '1.5rem',
+                    background: 'white',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '8px',
+                    cursor: creditsToAdd <= 0 ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    color: '#374151',
+                    opacity: creditsToAdd <= 0 ? 0.5 : 1
+                  }}
+                >
+                  −
+                </button>
+                <div style={{
+                  fontSize: '2rem',
+                  fontWeight: 'bold',
+                  minWidth: '80px',
+                  textAlign: 'center',
+                  color: creditsToAdd >= 0 ? '#059669' : '#dc2626'
+                }}>
+                  {creditsToAdd >= 0 ? '+' : ''}{creditsToAdd}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCreditsToAdd(prev => prev + 1)}
+                  className="counter-btn"
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    fontSize: '1.5rem',
+                    background: 'white',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    color: '#374151'
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div style={{ 
+              marginBottom: '10px', 
+              padding: '20px', 
+              background: '#f9fafb', 
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '8px' }}>
+                New Total
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1f2937' }}>
+                {(studentForCredits?.lessonsRemaining || 0) + creditsToAdd}
+              </div>
+            </div>
+          </div>
+        }
+      />
 
       {showInstructorModal && (
         <div className="modal-overlay" onClick={() => setShowInstructorModal(false)}>

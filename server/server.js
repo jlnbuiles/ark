@@ -193,6 +193,31 @@ app.put('/api/students/:id', (req, res) => {
     res.json(student);
 });
 
+// Add credits to a student
+app.put('/api/students/:id/credits', (req, res) => {
+    const studentId = parseInt(req.params.id);
+    const student = students.find(s => s.id === studentId);
+    
+    if (!student) {
+        return res.status(404).json({ error: 'Student not found' });
+    }
+    
+    const { creditsToAdd } = req.body;
+    
+    if (creditsToAdd === undefined || typeof creditsToAdd !== 'number') {
+        return res.status(400).json({ error: 'creditsToAdd must be a number' });
+    }
+    
+    student.lessonsRemaining += creditsToAdd;
+    
+    // Ensure credits don't go below 0
+    if (student.lessonsRemaining < 0) {
+        student.lessonsRemaining = 0;
+    }
+    
+    res.json(student);
+});
+
 // Get count of scheduled (non-completed, non-cancelled) lessons for a student
 app.get('/api/students/:id/scheduled-count', (req, res) => {
     const studentId = parseInt(req.params.id);
