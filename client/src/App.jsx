@@ -4,6 +4,7 @@ import { faCalendarDays, faUsers, faUserPlus, faMagnifyingGlass, faStickyNote, f
 import SearchBox from './components/SearchBox';
 import ConfirmModal from './components/ConfirmModal';
 import ListView from './components/ListView';
+import Button from './components/Button';
 import './App.css';
 
 const API_URL = 'http://localhost:3001/api';
@@ -857,9 +858,9 @@ function App() {
               />
             }
             createButton={
-              <button className="create-btn" onClick={() => setShowModal(true)}>
+              <Button variant="blue" onClick={() => setShowModal(true)}>
                 + Create
-              </button>
+              </Button>
             }
             loading={loading}
             isEmpty={students.length === 0}
@@ -912,8 +913,8 @@ function App() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button
-                    className="check-in-btn"
+                  <Button
+                    variant="blue"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCheckIn(student.id);
@@ -921,16 +922,16 @@ function App() {
                     disabled={student.lessonsRemaining === 0}
                   >
                     {student.lessonsRemaining === 0 ? 'No Lessons' : 'Schedule Lesson'}
-                  </button>
-                  <button
-                    className="credits-btn"
+                  </Button>
+                  <Button
+                    variant="success"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenCreditsModal(student);
                     }}
                   >
                     Credits +
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -947,9 +948,9 @@ function App() {
               />
             }
             createButton={
-              <button className="create-btn" onClick={() => setShowHorseModal(true)}>
+              <Button variant="blue" onClick={() => setShowHorseModal(true)}>
                 + Create
-              </button>
+              </Button>
             }
             loading={loading}
             isEmpty={horses.filter(horse => 
@@ -1035,9 +1036,9 @@ function App() {
               />
             }
             createButton={
-              <button className="create-btn" onClick={() => setShowInstructorModal(true)}>
+              <Button variant="blue" onClick={() => setShowInstructorModal(true)}>
                 + Create
-              </button>
+              </Button>
             }
             loading={loading}
             isEmpty={teachers.filter(teacher => {
@@ -1148,24 +1149,24 @@ function App() {
                     )}
                     {lesson.status === 'scheduled' && (
                       <>
-                        <button 
-                          className="checkin-btn-small"
+                        <Button 
+                          variant="primary"
                           onClick={() => handleLessonCheckIn(lesson)}
                         >
                           Check In
-                        </button>
-                        <button 
-                          className="reschedule-btn-small"
+                        </Button>
+                        <Button 
+                          variant="secondary"
                           onClick={() => handleRescheduleLesson(lesson)}
                         >
                           Reschedule
-                        </button>
+                        </Button>
                       </>
                     )}
                     {lesson.lessonsRemaining < 3 && (
-                      <button className="renew-btn-small">
+                      <Button variant="warning">
                         Renew
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
