@@ -10,31 +10,37 @@ A full-stack React + Node.js application for managing student attendance and les
 ## Setup
 
 ### 1. Install Server Dependencies
-\`\`\`bash
+
+```bash
 cd server
 npm install
-\`\`\`
+```
 
 ### 2. Install Client Dependencies
-\`\`\`bash
+
+```bash
 cd client
 npm install
-\`\`\`
+```
 
 ## Running the Application
 
 ### Start the Backend (Terminal 1)
-\`\`\`bash
+
+```bash
 cd server
 npm run dev
-\`\`\`
+```
+
 Server will run on http://localhost:3001
 
 ### Start the Frontend (Terminal 2)
-\`\`\`bash
+
+```bash
 cd client
 npm run dev
-\`\`\`
+```
+
 Client will run on http://localhost:3000
 
 ## Features

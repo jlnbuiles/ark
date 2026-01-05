@@ -50,7 +50,8 @@ function App() {
     date: '',
     time: '',
     horseId: '',
-    instructorId: ''
+    instructorId: '',
+    repeat: 'none'
   });
   const [showHorseModal, setShowHorseModal] = useState(false);
   const [editingHorse, setEditingHorse] = useState(null);
@@ -70,6 +71,11 @@ function App() {
     lessonsRemaining: ''
   });
   const [validationErrors, setValidationErrors] = useState({});
+  const [scheduleConflicts, setScheduleConflicts] = useState([]);
+  const [showConflictWarning, setShowConflictWarning] = useState(false);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [conflictingDates, setConflictingDates] = useState([]);
+  const [studentScheduledCount, setStudentScheduledCount] = useState(0);
   const studentsPerPage = 10;
 
   // Fetch students when search term or page changes
@@ -138,6 +144,18 @@ function App() {
     }
   };
 
+  const getStudentScheduledLessonsCount = async (studentId) => {
+    try {
+      const response = await fetch(`${API_URL}/students/${studentId}/scheduled-count`);
+      if (!response.ok) return 0;
+      const data = await response.json();
+      return data.count || 0;
+    } catch (err) {
+      console.error('Error fetching scheduled lessons count:', err);
+      return 0;
+    }
+  };
+
   const handleCheckIn = async (studentId) => {
     const student = students.find(s => s.id === studentId);
     if (student) {
@@ -146,9 +164,14 @@ function App() {
         date: new Date().toISOString().split('T')[0],
         time: '09:00',
         horseId: horses[0]?.id || '',
-        instructorId: teachers[0]?.id || ''
+        instructorId: teachers[0]?.id || '',
+        repeat: 'none'
       });
       setShowScheduleModal(true);
+      
+      // Fetch and set the count of already scheduled lessons
+      const scheduledCount = await getStudentScheduledLessonsCount(studentId);
+      setStudentScheduledCount(scheduledCount);
     }
   };
 
@@ -172,41 +195,176 @@ function App() {
       const horse = horses.find(h => h.id === parseInt(scheduleLessonForm.horseId));
       const instructor = teachers.find(t => t.id === parseInt(scheduleLessonForm.instructorId));
       
-      const response = await fetch(`${API_URL}/lessons`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          date: scheduleLessonForm.date,
-          time: scheduleLessonForm.time,
-          studentId: studentToSchedule.id,
-          studentName: studentToSchedule.name,
-          horseId: parseInt(scheduleLessonForm.horseId),
-          horseName: horse?.name,
-          instructorId: parseInt(scheduleLessonForm.instructorId),
-          instructorName: `${instructor?.firstName} ${instructor?.lastName}`,
-          lessonsRemaining: studentToSchedule.lessonsRemaining,
-          specialConditions: studentToSchedule.specialConditions || []
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to schedule lesson');
+      // Get count of already scheduled lessons for this student
+      const scheduledCount = await getStudentScheduledLessonsCount(studentToSchedule.id);
+      const availableCredits = studentToSchedule.lessonsRemaining - scheduledCount;
+      
+      if (availableCredits <= 0) {
+        alert('This student has no available credits. All credits are already scheduled.');
+        return;
       }
-
-      // Close modal and refresh if on schedule tab
-      setShowScheduleModal(false);
-      setStudentToSchedule(null);
-      if (activeTab === 'schedule') {
-        fetchSchedule(selectedDate);
+      
+      // Calculate how many lessons to create based on repeat option
+      const datesToSchedule = [];
+      const startDate = new Date(scheduleLessonForm.date);
+      
+      if (scheduleLessonForm.repeat === 'none') {
+        datesToSchedule.push(startDate);
+      } else {
+        // Determine interval in weeks
+        let intervalWeeks;
+        let maxLessons;
+        
+        switch (scheduleLessonForm.repeat) {
+          case 'weekly':
+            intervalWeeks = 1;
+            maxLessons = 12;
+            break;
+          case 'biweekly':
+            intervalWeeks = 2;
+            maxLessons = 12;
+            break;
+          case 'monthly':
+            intervalWeeks = 4;
+            maxLessons = 12;
+            break;
+          default:
+            intervalWeeks = 1;
+            maxLessons = 1;
+        }
+        
+        // Limit by student's available credits (remaining minus already scheduled)
+        const numberOfLessons = Math.min(maxLessons, availableCredits);
+        
+        // Create array of dates
+        for (let i = 0; i < numberOfLessons; i++) {
+          const lessonDate = new Date(startDate);
+          lessonDate.setDate(startDate.getDate() + (i * intervalWeeks * 7));
+          datesToSchedule.push(lessonDate);
+        }
       }
-      alert('Lesson scheduled successfully!');
+      
+      // Check availability for all dates first
+      const available = [];
+      const conflicts = [];
+      
+      for (const lessonDate of datesToSchedule) {
+        const dateStr = lessonDate.toISOString().split('T')[0];
+        
+        // Check availability by attempting to validate
+        const checkResponse = await fetch(`${API_URL}/lessons/check-availability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            date: dateStr,
+            time: scheduleLessonForm.time,
+            horseId: parseInt(scheduleLessonForm.horseId),
+            instructorId: parseInt(scheduleLessonForm.instructorId)
+          }),
+        });
+        
+        if (checkResponse.ok) {
+          available.push({ date: dateStr, formatted: lessonDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) });
+        } else {
+          const error = await checkResponse.json();
+          conflicts.push({ 
+            date: dateStr, 
+            formatted: lessonDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+            reason: error.error 
+          });
+        }
+      }
+      
+      // If there are conflicts, show them to the user
+      if (conflicts.length > 0) {
+        setAvailableDates(available);
+        setConflictingDates(conflicts);
+        setShowConflictWarning(true);
+        return;
+      }
+      
+      // Schedule all lessons if no conflicts
+      await scheduleAvailableLessons(available);
+      
     } catch (err) {
       alert(err.message);
       console.error('Error scheduling lesson:', err);
     }
+  };
+  
+  const scheduleAvailableLessons = async (datesToSchedule) => {
+    try {
+      const horse = horses.find(h => h.id === parseInt(scheduleLessonForm.horseId));
+      const instructor = teachers.find(t => t.id === parseInt(scheduleLessonForm.instructorId));
+      
+      const scheduledCount = [];
+      for (const dateInfo of datesToSchedule) {
+        const response = await fetch(`${API_URL}/lessons`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            date: dateInfo.date,
+            time: scheduleLessonForm.time,
+            studentId: studentToSchedule.id,
+            studentName: studentToSchedule.name,
+            horseId: parseInt(scheduleLessonForm.horseId),
+            horseName: horse?.name,
+            instructorId: parseInt(scheduleLessonForm.instructorId),
+            instructorName: `${instructor?.firstName} ${instructor?.lastName}`,
+            lessonsRemaining: studentToSchedule.lessonsRemaining,
+            specialConditions: studentToSchedule.specialConditions || []
+          }),
+        });
+
+        if (response.ok) {
+          scheduledCount.push(dateInfo.date);
+        } else {
+          const error = await response.json();
+          console.warn(`Failed to schedule lesson on ${dateInfo.date}:`, error.error);
+        }
+      }
+
+      // Close modal and refresh
+      setShowScheduleModal(false);
+      setStudentToSchedule(null);
+      setScheduleLessonForm({
+        date: '',
+        time: '',
+        horseId: '',
+        instructorId: '',
+        repeat: 'none'
+      });
+      setShowConflictWarning(false);
+      setAvailableDates([]);
+      setConflictingDates([]);
+      
+      if (activeTab === 'schedule') {
+        fetchSchedule(selectedDate);
+      }
+      
+      if (scheduledCount.length > 0) {
+        alert(`Successfully scheduled ${scheduledCount.length} lesson(s)!`);
+      } else {
+        alert('Failed to schedule lessons.');
+      }
+    } catch (err) {
+      alert(err.message);
+      console.error('Error scheduling lessons:', err);
+    }
+  };
+  
+  const handleConfirmScheduleWithConflicts = async () => {
+    await scheduleAvailableLessons(availableDates);
+  };
+  
+  const handleCancelSchedule = () => {
+    setShowConflictWarning(false);
+    setAvailableDates([]);
+    setConflictingDates([]);
   };
 
   const handleSearchChange = (e) => {
@@ -1383,13 +1541,86 @@ function App() {
                 </div>
               </div>
 
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="repeat">Repeat</label>
+                  <select
+                    id="repeat"
+                    name="repeat"
+                    value={scheduleLessonForm.repeat}
+                    onChange={handleScheduleLessonFormChange}
+                    className="form-input"
+                  >
+                    <option value="none">None</option>
+                    <option value="weekly">
+                      Every Week ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
+                    </option>
+                    <option value="biweekly">
+                      Every 2 Weeks ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
+                    </option>
+                    <option value="monthly">
+                      Every 4 Weeks ({Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount))} lesson{Math.min(12, Math.max(0, (studentToSchedule?.lessonsRemaining || 0) - studentScheduledCount)) !== 1 ? 's' : ''})
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              {showConflictWarning && (
+                <div className="conflict-warning">
+                  <h3 style={{ color: '#dc2626', marginBottom: '10px' }}>⚠️ Scheduling Conflicts Detected</h3>
+                  
+                  {conflictingDates.length > 0 && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <strong>Unavailable Dates:</strong>
+                      <ul style={{ marginTop: '5px', marginLeft: '20px' }}>
+                        {conflictingDates.map((conflict, idx) => (
+                          <li key={idx} style={{ color: '#dc2626', marginBottom: '5px' }}>
+                            {conflict.formatted} - {conflict.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {availableDates.length > 0 && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <strong style={{ color: '#059669' }}>Available Dates ({availableDates.length}):</strong>
+                      <ul style={{ marginTop: '5px', marginLeft: '20px' }}>
+                        {availableDates.map((dateInfo, idx) => (
+                          <li key={idx} style={{ color: '#059669', marginBottom: '5px' }}>
+                            {dateInfo.formatted}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  <p style={{ marginTop: '15px', fontSize: '0.9rem', color: '#6b7280' }}>
+                    Would you like to schedule the {availableDates.length} available lesson(s)?
+                  </p>
+                </div>
+              )}
+
               <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setShowScheduleModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="submit-btn">
-                  Confirm
-                </button>
+                {showConflictWarning ? (
+                  <>
+                    <button type="button" className="cancel-btn" onClick={handleCancelSchedule}>
+                      Cancel
+                    </button>
+                    <button type="button" className="submit-btn" onClick={handleConfirmScheduleWithConflicts}>
+                      Schedule {availableDates.length} Lesson(s)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="cancel-btn" onClick={() => setShowScheduleModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="submit-btn">
+                      Confirm
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </div>

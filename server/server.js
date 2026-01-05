@@ -177,6 +177,22 @@ app.put('/api/students/:id', (req, res) => {
     res.json(student);
 });
 
+// Get count of scheduled (non-completed, non-cancelled) lessons for a student
+app.get('/api/students/:id/scheduled-count', (req, res) => {
+    const studentId = parseInt(req.params.id);
+    
+    let count = 0;
+    // Count all scheduled lessons for this student across all dates
+    for (const date in scheduledLessons) {
+        const lessonsOnDate = scheduledLessons[date].filter(
+            lesson => lesson.studentId === studentId && lesson.status === 'scheduled'
+        );
+        count += lessonsOnDate.length;
+    }
+    
+    res.json({ count });
+});
+
 // In-memory schedule data (indexed by date)
 let scheduledLessons = {};
 
@@ -283,6 +299,60 @@ app.get('/api/schedule', (req, res) => {
     }
     
     res.json(scheduledLessons[date]);
+});
+
+// Check availability for a lesson (without creating it)
+app.post('/api/lessons/check-availability', (req, res) => {
+    const { date, time, horseId, instructorId } = req.body;
+    
+    if (!date || !time || !horseId || !instructorId) {
+        return res.status(400).json({ error: 'Date, time, horseId, and instructorId are required' });
+    }
+    
+    initializeSchedule(date);
+    
+    // Helper function to check if two time slots overlap (assuming 1 hour duration)
+    const timesOverlap = (time1, time2) => {
+        const parseTime = (timeStr) => {
+            const [time, period] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            return hours * 60 + (minutes || 0);
+        };
+        
+        const start1 = parseTime(time1);
+        const end1 = start1 + 60;
+        const start2 = parseTime(time2);
+        const end2 = start2 + 60;
+        
+        return (start1 < end2 && start2 < end1);
+    };
+    
+    // Check if the horse is already scheduled at this time
+    const horseConflict = scheduledLessons[date].find(l => 
+        l.horseId === horseId && timesOverlap(l.time, time)
+    );
+    if (horseConflict) {
+        const horse = horses.find(h => h.id === horseId);
+        return res.status(409).json({ 
+            error: `Horse "${horse?.name}" is already scheduled at ${horseConflict.time}` 
+        });
+    }
+    
+    // Check if the instructor is already scheduled at this time
+    const instructorConflict = scheduledLessons[date].find(l => 
+        l.instructorId === instructorId && timesOverlap(l.time, time)
+    );
+    if (instructorConflict) {
+        const instructor = teachers.find(t => t.id === instructorId);
+        return res.status(409).json({ 
+            error: `Instructor "${instructor?.firstName} ${instructor?.lastName}" is already scheduled at ${instructorConflict.time}` 
+        });
+    }
+    
+    // No conflicts - available
+    res.json({ available: true });
 });
 
 // Create a new lesson

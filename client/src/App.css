@@ -1085,6 +1085,30 @@
   border-color: #d1d5db;
 }
 
+.conflict-warning {
+  background: #fef2f2;
+  border: 2px solid #fecaca;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.conflict-warning h3 {
+  margin: 0 0 15px 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.conflict-warning ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.conflict-warning li {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 @media (max-width: 768px) {
   .form-row {
     grid-template-columns: 1fr;
