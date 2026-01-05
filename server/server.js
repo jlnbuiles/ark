@@ -106,8 +106,24 @@ app.get('/api/students', (req, res) => {
     
     const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
     
+    // Add scheduled lesson count to each student
+    const studentsWithScheduledCount = paginatedStudents.map(student => {
+        let scheduledCount = 0;
+        for (const date in scheduledLessons) {
+            const lessonsOnDate = scheduledLessons[date].filter(
+                lesson => lesson.studentId === student.id && lesson.status === 'scheduled'
+            );
+            scheduledCount += lessonsOnDate.length;
+        }
+        return {
+            ...student,
+            scheduledLessons: scheduledCount,
+            unscheduledLessons: student.lessonsRemaining - scheduledCount
+        };
+    });
+    
     res.json({
-        students: paginatedStudents,
+        students: studentsWithScheduledCount,
         total: filteredStudents.length,
         page: pageNum,
         totalPages: Math.ceil(filteredStudents.length / limitNum)

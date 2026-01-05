@@ -342,6 +342,9 @@ function App() {
       setAvailableDates([]);
       setConflictingDates([]);
       
+      // Refresh students list to show updated available lessons
+      await fetchStudents();
+      
       if (activeTab === 'schedule') {
         fetchSchedule(selectedDate);
       }
@@ -855,8 +858,8 @@ function App() {
                       )}
                     </h3>
                     <div className="lessons-info">
-                      <span className={`lessons-badge ${student.lessonsRemaining <= 3 ? 'low' : ''}`}>
-                        {student.lessonsRemaining} {student.lessonsRemaining === 1 ? 'lesson' : 'lessons'} remaining
+                      <span className={`lessons-badge ${(student.unscheduledLessons ?? student.lessonsRemaining) <= 3 ? 'low' : ''}`}>
+                        {student.unscheduledLessons ?? student.lessonsRemaining} unscheduled {(student.unscheduledLessons ?? student.lessonsRemaining) === 1 ? 'lesson' : 'lessons'}
                       </span>
                     </div>
                   </div>
