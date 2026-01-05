@@ -11,6 +11,7 @@ import InstructorsTab from './modules/instructors/List';
 import ReportsTab from './modules/reports/List';
 import ScheduleTab from './modules/schedule/List';
 import CreateStudentModal from './modules/students/CreateModal';
+import StudentDetailModal from './modules/students/DetailModal';
 import ScheduleLessonModal from './modules/schedule/ScheduleModal';
 import CreateInstructorModal from './modules/instructors/CreateModal';
 import * as scheduleActions from './modules/schedule/actions';
@@ -805,96 +806,11 @@ function App() {
         onSubmit={handleCreateInstructor}
       />
 
-      {showStudentDetails && selectedStudent && (
-        <div className="modal-overlay" onClick={() => setShowStudentDetails(false)}>
-          <div className="modal-content student-details-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Student Details</h2>
-              <button className="modal-close" onClick={() => setShowStudentDetails(false)}>&times;</button>
-            </div>
-            
-            <div className="student-details-content">
-              <div className="detail-section">
-                <h3 className="detail-section-title">Student Information</h3>
-                <div className="detail-row">
-                  <span className="detail-label">Name:</span>
-                  <span className="detail-value">{selectedStudent.name}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Date of Birth:</span>
-                  <span className="detail-value">{selectedStudent.dateOfBirth || 'Not specified'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Enrollment Date:</span>
-                  <span className="detail-value">{selectedStudent.enrollmentDate || 'Not specified'}</span>
-                </div>
-              </div>
-
-              <div className="detail-section">
-                <h3 className="detail-section-title">Lesson Information</h3>
-                <div className="detail-row">
-                  <span className="detail-label">Lessons Remaining:</span>
-                  <span className="detail-value">{selectedStudent.lessonsRemaining}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Lessons Completed:</span>
-                  <span className="detail-value">{selectedStudent.lessonsCompleted || 0}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Total Lessons:</span>
-                  <span className="detail-value">{(selectedStudent.lessonsRemaining || 0) + (selectedStudent.lessonsCompleted || 0)}</span>
-                </div>
-              </div>
-
-              {selectedStudent.specialConditions && selectedStudent.specialConditions.length > 0 && (
-                <div className="detail-section">
-                  <h3 className="detail-section-title">Special Conditions</h3>
-                  <div className="special-conditions-list">
-                    {selectedStudent.specialConditions.map((condition, index) => (
-                      <span key={index} className="condition-badge">
-                        {condition.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedStudent.notes && (
-                <div className="detail-section">
-                  <h3 className="detail-section-title">Notes</h3>
-                  <p className="notes-content">{selectedStudent.notes}</p>
-                </div>
-              )}
-
-              <div className="detail-section">
-                <h3 className="detail-section-title">Guardian Information</h3>
-                <div className="detail-row">
-                  <span className="detail-label">Name:</span>
-                  <span className="detail-value">{selectedStudent.guardianName || 'Not specified'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Email:</span>
-                  <span className="detail-value">{selectedStudent.guardianEmail || 'Not specified'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Phone:</span>
-                  <span className="detail-value">{selectedStudent.guardianPhone || 'Not specified'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Address:</span>
-                  <span className="detail-value">{selectedStudent.guardianAddress || 'Not specified'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" className="cancel-btn" onClick={() => setShowStudentDetails(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StudentDetailModal
+        isOpen={showStudentDetails}
+        student={selectedStudent}
+        onClose={() => setShowStudentDetails(false)}
+      />
 
       {showCheckInConfirm && (
         <ConfirmModal
